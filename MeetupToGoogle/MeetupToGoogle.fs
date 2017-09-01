@@ -22,28 +22,29 @@ open System
 
 let getCredential () =
     use certificate = new X509Certificate2("MeetupToGoogle-e57f0015de00.p12", "notasecret", X509KeyStorageFlags.Exportable)
-    let serviceAccountCredential = ServiceAccountCredential.Initializer("meetuptogoogle@avian-principle-178522.iam.gserviceaccount.com")
-    serviceAccountCredential.Scopes <- [CalendarService.Scope.Calendar]
+    let serviceAccountCredential = 
+        ServiceAccountCredential.Initializer(
+            "meetuptogoogle@avian-principle-178522.iam.gserviceaccount.com", 
+            Scopes = [CalendarService.Scope.Calendar])
     ServiceAccountCredential(serviceAccountCredential.FromCertificate(certificate))
 
-let baseClientService = BaseClientService.Initializer()
-baseClientService.HttpClientInitializer <- getCredential()
-baseClientService.ApplicationName <- "MeetupToGoogle"
+let baseClientService = BaseClientService.Initializer(
+                            HttpClientInitializer = getCredential(),
+                            ApplicationName = "MeetupToGoogle")
 let calendarService = new CalendarService(baseClientService)
 
 let calendarId = "8hc5n2800f4paesicf2u8610d4@group.calendar.google.com" 
 
-let e = Data.Event()
-e.Summary <- "Youhou!!"
-e.Start <- Data.EventDateTime()
-e.Start.DateTime <- Nullable(DateTime.Now)
-e.End <- Data.EventDateTime()
-e.End.DateTime <- Nullable(DateTime.Now.AddHours(2.0))
+let e = Data.Event(
+            Summary = "Youhou!!",
+            Start = Data.EventDateTime(DateTime = Nullable(DateTime.Now)),
+            End = Data.EventDateTime(DateTime = Nullable(DateTime.Now.AddHours(2.0))))
 calendarService.Events.Insert(e, calendarId).Execute()
 
-let eventsRequest = calendarService.Events.List(calendarId)
-eventsRequest.OrderBy <- Nullable(EventsResource.ListRequest.OrderByEnum.StartTime)
-eventsRequest.TimeMin <- Nullable(DateTime.Now)
+let eventsRequest = calendarService.Events.List(
+                        calendarId, 
+                        OrderBy = Nullable(EventsResource.ListRequest.OrderByEnum.StartTime),
+                        TimeMin = Nullable(DateTime.Now))
 let events = eventsRequest.Execute()
 
 [<EntryPoint>]
