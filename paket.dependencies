@@ -1,0 +1,8 @@
+source https://www.nuget.org/api/v2
+nuget FAKE
+nuget FSharp.Core
+nuget FSharp.Data
+nuget Google.Apis
+nuget Google.Apis.Auth
+nuget Google.Apis.Calendar.v3
+nuget ical.net
