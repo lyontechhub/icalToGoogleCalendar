@@ -1,4 +1,4 @@
-module MeetupToGoogle
+module IcalToGoogleCalendar
 
 open FSharp.Data
 
@@ -56,14 +56,17 @@ and Event = {
     Description: string
     Start: DateTime
     End: DateTime
-    Updated: DateTime
+    UpdatedOnSource: DateTime
 }
 and EventId = string
 
 let isSourceEventMoreRecentThanGoogleEventIfExist (existingGoogleEvents:IDictionary<string, Data.Event>) (sourceEvent:IEvent) =
+    printfn "%b" (existingGoogleEvents.Item(sourceEvent.Uid).ExtendedProperties <> null)
     existingGoogleEvents.ContainsKey(sourceEvent.Uid) 
+        && existingGoogleEvents.Item(sourceEvent.Uid).ExtendedProperties <> null
+        && existingGoogleEvents.Item(sourceEvent.Uid).ExtendedProperties.Shared.ContainsKey("updatedOnSource")
         && sourceEvent.LastModified.Value
-            .CompareTo(existingGoogleEvents.Item(sourceEvent.Uid).Updated.Value) >= 0
+            .CompareTo(DateTime.Parse(existingGoogleEvents.Item(sourceEvent.Uid).ExtendedProperties.Shared.Item("updatedOnSource"))) >= 0
 
 let syncEvent (existingGoogleEvents:IDictionary<string, Data.Event>) (event:IEvent) = 
     let e = { Id = event.Uid
@@ -71,7 +74,7 @@ let syncEvent (existingGoogleEvents:IDictionary<string, Data.Event>) (event:IEve
               Description = event.Description
               Start = event.Start.Value
               End = event.End.Value
-              Updated = event.LastModified.Value } 
+              UpdatedOnSource = event.LastModified.Value }
     if isSourceEventMoreRecentThanGoogleEventIfExist existingGoogleEvents event then
         Update e
     else
@@ -80,13 +83,16 @@ let syncEvent (existingGoogleEvents:IDictionary<string, Data.Event>) (event:IEve
 let applySync (calendarService:CalendarService) calendarId syncAction =
     match syncAction with
     | Create e -> 
+        let extendedProperties = 
+            Data.Event.ExtendedPropertiesData(
+                Shared = ([("updatedOnSource", e.UpdatedOnSource.ToString())] |> dict))
         let googleEvent = Data.Event(
                             ICalUID = e.Id,
                             Summary = e.Summary,
                             Description = e.Description,
                             Start = Data.EventDateTime(DateTime = Nullable(e.Start)),
                             End = Data.EventDateTime(DateTime = Nullable(e.End)),
-                            Updated = Nullable(e.Updated))
+                            ExtendedProperties = extendedProperties)
         calendarService.Events.Insert(googleEvent, calendarId).Execute() |> ignore 
     | Update e -> ()
     syncAction
@@ -98,6 +104,7 @@ let main argv =
     let existingGoogleEvents = 
         calendarService.Events.List(
             calendarId, 
+            ShowDeleted = Nullable(true),
             MaxResults = Nullable(1000),
             TimeMin = Nullable(DateTime.Now)).Execute().Items
         |> Seq.map (fun e -> e.ICalUID, e)
@@ -108,3 +115,8 @@ let main argv =
     |> Seq.countBy (function | Create _ -> "created" | Update _ -> "updated")
     |> Seq.iter (fun x -> printfn "%i %s" (snd x) (fst x))
     0 // return an integer exit code
+
+    // let extendedProperties = 
+    //         Data.Event.ExtendedPropertiesData(
+    //             Shared = ([("updatedOnSource", DateTime.Now.AddYears(-1).ToString())] |> dict))
+    // calendarService.Events.Patch(Data.Event(ExtendedProperties = extendedProperties), calendarId, "_clr6arjkbsp38cho64sj4dho81mmapbkelo2sorfdk")

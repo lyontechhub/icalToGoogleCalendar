@@ -1,0 +1,8 @@
+#r "../packages/FSharp.Data/lib/portable-net45+netcore45/FSharp.Data.dll"
+#r "../packages/Google.Apis/lib/netstandard1.3/Google.Apis.dll"
+#r "../packages/Google.Apis.Auth/lib/netstandard1.3/Google.Apis.Auth.dll"
+#r "../packages/Google.Apis.Calendar.v3/lib/portable-net45+sl50+netcore45+wpa81+wp8/Google.Apis.Calendar.v3.dll"
+#r "../packages/Google.Apis.Core/lib/netstandard1.3/Google.Apis.Core.dll"
+#r "../packages/Ical.Net/lib/net46/Ical.Net.dll"
+#r "../packages/Ical.Net/lib/net46/Ical.Net.Collections.dll"
+#r "../packages/System.Security.Cryptography.X509Certificates/lib/net461/System.Security.Cryptography.X509Certificates.dll"

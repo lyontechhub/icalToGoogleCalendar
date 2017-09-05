@@ -6,3 +6,4 @@ nuget Google.Apis
 nuget Google.Apis.Auth
 nuget Google.Apis.Calendar.v3
 nuget ical.net
+nuget System.Security.Cryptography.X509Certificates
