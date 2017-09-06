@@ -36,8 +36,16 @@ let getGoogleCalendarService () =
 open System.Collections.Generic
 open Ical.Net.Interfaces.Components
 
-type SyncAction = Create of Event | Update of Event | UpToDate
-and Event = {
+type ExistingEvent = {
+    GoogleEventId: GoogleEventId
+    UpdatedOnSource: DateTime
+}
+and GoogleEventId = string
+type SyncAction = 
+    | Create of SourceEvent 
+    | Update of SourceEvent * GoogleEventId
+    | UpToDate
+and SourceEvent = {
     Id: EventId
     Summary: string
     Description: string
@@ -46,18 +54,14 @@ and Event = {
     UpdatedOnSource: DateTime
 }
 and EventId = string
-type ExistingEvent = {
-    Id: EventId
-    UpdatedOnSource: DateTime
-}
 
-let syncEvent (existingGoogleEvents:IDictionary<string, ExistingEvent>) (event:Event) = 
+let syncEvent (existingGoogleEvents:IDictionary<string, ExistingEvent>) event = 
     if existingGoogleEvents.ContainsKey(event.Id) then
         let existingEvent = existingGoogleEvents.Item(event.Id)
         if existingEvent.UpdatedOnSource.Equals(event.UpdatedOnSource) then
             UpToDate
         else // even if UpdateOnSource is greater on Google than source (manually modified?)
-            Update event
+            Update (event, existingEvent.GoogleEventId)
     else
         Create event
 
@@ -69,7 +73,7 @@ let convertSourceEvent (event:IEvent) =
       End = event.End.Value
       UpdatedOnSource = event.LastModified.Value }
 
-let convertExistingEvent (googleEvent:Data.Event) =
+let convertToExistingEvent (googleEvent:Data.Event) =
     let updatedOnSource = 
         if googleEvent.ExtendedProperties <> null
             && googleEvent.ExtendedProperties.Shared.ContainsKey("updatedOnSource") then
@@ -77,7 +81,7 @@ let convertExistingEvent (googleEvent:Data.Event) =
         else
             DateTime.MinValue
     { 
-        Id = googleEvent.ICalUID
+        GoogleEventId = googleEvent.Id
         UpdatedOnSource = updatedOnSource
     }
 
@@ -87,24 +91,29 @@ let getExistingGoogleEvents (calendarService:CalendarService) calendarId =
         ShowDeleted = Nullable(true),
         MaxResults = Nullable(1000),
         TimeMin = Nullable(DateTime.Now)).Execute().Items
-    |> Seq.map (fun e -> e.ICalUID, convertExistingEvent e)
+    |> Seq.map (fun e -> e.ICalUID, convertToExistingEvent e)
     |> dict
+
+let convertFromSourceEvent event =
+    let extendedProperties = 
+        Data.Event.ExtendedPropertiesData(
+            Shared = ([("updatedOnSource", event.UpdatedOnSource.ToString())] |> dict))
+    Data.Event(
+        ICalUID = event.Id,
+        Summary = event.Summary,
+        Description = event.Description,
+        Start = Data.EventDateTime(DateTime = Nullable(event.Start)),
+        End = Data.EventDateTime(DateTime = Nullable(event.End)),
+        ExtendedProperties = extendedProperties)    
 
 let applySync (calendarService:CalendarService) calendarId syncAction =
     match syncAction with
     | Create e -> 
-        let extendedProperties = 
-            Data.Event.ExtendedPropertiesData(
-                Shared = ([("updatedOnSource", e.UpdatedOnSource.ToString())] |> dict))
-        let googleEvent = Data.Event(
-                            ICalUID = e.Id,
-                            Summary = e.Summary,
-                            Description = e.Description,
-                            Start = Data.EventDateTime(DateTime = Nullable(e.Start)),
-                            End = Data.EventDateTime(DateTime = Nullable(e.End)),
-                            ExtendedProperties = extendedProperties)
+        let googleEvent = convertFromSourceEvent e
         calendarService.Events.Insert(googleEvent, calendarId).Execute() |> ignore 
-    | Update e -> ()
+    | Update (e, googleEventId) -> 
+        let googleEvent = convertFromSourceEvent e
+        calendarService.Events.Patch(googleEvent, calendarId, googleEventId).Execute() |> ignore
     | UpToDate -> () 
     syncAction
 
@@ -121,7 +130,7 @@ let main argv =
     |> Seq.iter (fun x -> printfn "%i %s" (snd x) (fst x))
     0 // return an integer exit code
 
-    // let extendedProperties = 
-    //         Data.Event.ExtendedPropertiesData(
-    //             Shared = ([("updatedOnSource", DateTime.Now.AddYears(-1).ToString())] |> dict))
-    // calendarService.Events.Patch(Data.Event(ExtendedProperties = extendedProperties), calendarId, "_clr6arjkbsp38cho64sj4dho81mmapbkelo2sorfdk")
+    let extendedProperties = 
+            Data.Event.ExtendedPropertiesData(
+                Shared = ([("updatedOnSource", DateTime.Now.AddYears(-1).ToString())] |> dict))
+    calendarService.Events.Patch(Data.Event(ExtendedProperties = extendedProperties), calendarId, "_clr6arjkbsp38cph6crj6cpp81mmapbkelo2sorfdk").Execute()
