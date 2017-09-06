@@ -59,25 +59,50 @@ and Event = {
     UpdatedOnSource: DateTime
 }
 and EventId = string
+type ExistingEvent = {
+    Id: EventId
+    UpdatedOnSource: DateTime
+}
 
-let isSourceEventMoreRecentThanGoogleEventIfExist (existingGoogleEvents:IDictionary<string, Data.Event>) (sourceEvent:IEvent) =
-    existingGoogleEvents.ContainsKey(sourceEvent.Uid) 
-        && existingGoogleEvents.Item(sourceEvent.Uid).ExtendedProperties <> null
-        && existingGoogleEvents.Item(sourceEvent.Uid).ExtendedProperties.Shared.ContainsKey("updatedOnSource")
-        && sourceEvent.LastModified.Value
-            .CompareTo(DateTime.Parse(existingGoogleEvents.Item(sourceEvent.Uid).ExtendedProperties.Shared.Item("updatedOnSource"))) >= 0
+let isSourceEventMoreRecentThanExistingEventIfExists (existingGoogleEvents:IDictionary<string, ExistingEvent>) (sourceEvent:Event) =
+    existingGoogleEvents.ContainsKey(sourceEvent.Id) 
+        && sourceEvent.UpdatedOnSource
+            .CompareTo(existingGoogleEvents.Item(sourceEvent.Id).UpdatedOnSource) >= 0
 
-let syncEvent (existingGoogleEvents:IDictionary<string, Data.Event>) (event:IEvent) = 
-    let e = { Id = event.Uid
-              Summary = event.Summary
-              Description = event.Description
-              Start = event.Start.Value
-              End = event.End.Value
-              UpdatedOnSource = event.LastModified.Value }
-    if isSourceEventMoreRecentThanGoogleEventIfExist existingGoogleEvents event then
-        Update e
+let syncEvent existingGoogleEvents event = 
+    if isSourceEventMoreRecentThanExistingEventIfExists existingGoogleEvents event then
+        Update event
     else
-        Create e
+        Create event
+
+let convertSourceEvent (event:IEvent) =
+    { Id = event.Uid
+      Summary = event.Summary
+      Description = event.Description
+      Start = event.Start.Value
+      End = event.End.Value
+      UpdatedOnSource = event.LastModified.Value }
+
+let convertExistingEvent (googleEvent:Data.Event) =
+    let updatedOnSource = 
+        if googleEvent.ExtendedProperties <> null
+            && googleEvent.ExtendedProperties.Shared.ContainsKey("updatedOnSource") then
+            DateTime.Parse(googleEvent.ExtendedProperties.Shared.Item("updatedOnSource"))
+        else
+            DateTime.MinValue
+    { 
+        Id = googleEvent.ICalUID
+        UpdatedOnSource = updatedOnSource
+    }
+
+let getExistingGoogleEvents (calendarService:CalendarService) calendarId =
+    calendarService.Events.List(
+        calendarId, 
+        ShowDeleted = Nullable(true),
+        MaxResults = Nullable(1000),
+        TimeMin = Nullable(DateTime.Now)).Execute().Items
+    |> Seq.map (fun e -> e.ICalUID, convertExistingEvent e)
+    |> dict
 
 let applySync (calendarService:CalendarService) calendarId syncAction =
     match syncAction with
@@ -100,15 +125,9 @@ let applySync (calendarService:CalendarService) calendarId syncAction =
 let main argv =
     let calendarId = "8hc5n2800f4paesicf2u8610d4@group.calendar.google.com" 
     let calendarService = getGoogleCalendarService()
-    let existingGoogleEvents = 
-        calendarService.Events.List(
-            calendarId, 
-            ShowDeleted = Nullable(true),
-            MaxResults = Nullable(1000),
-            TimeMin = Nullable(DateTime.Now.AddDays(-2.0))).Execute().Items
-        |> Seq.map (fun e -> e.ICalUID, e)
-        |> dict
+    let existingGoogleEvents = getExistingGoogleEvents calendarService calendarId
     getEvents()
+    |> Seq.map convertSourceEvent
     |> Seq.map (syncEvent existingGoogleEvents)
     |> Seq.map (applySync calendarService calendarId)
     |> Seq.countBy (function | Create _ -> "created" | Update _ -> "updated")
