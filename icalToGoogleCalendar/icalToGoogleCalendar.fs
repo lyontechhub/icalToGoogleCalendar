@@ -36,7 +36,7 @@ let getGoogleCalendarService () =
 open System.Collections.Generic
 open Ical.Net.Interfaces.Components
 
-type SyncAction = Create of Event | Update of Event
+type SyncAction = Create of Event | Update of Event | UpToDate
 and Event = {
     Id: EventId
     Summary: string
@@ -51,14 +51,13 @@ type ExistingEvent = {
     UpdatedOnSource: DateTime
 }
 
-let isSourceEventMoreRecentThanExistingEventIfExists (existingGoogleEvents:IDictionary<string, ExistingEvent>) (sourceEvent:Event) =
-    existingGoogleEvents.ContainsKey(sourceEvent.Id) 
-        && sourceEvent.UpdatedOnSource
-            .CompareTo(existingGoogleEvents.Item(sourceEvent.Id).UpdatedOnSource) >= 0
-
-let syncEvent existingGoogleEvents event = 
-    if isSourceEventMoreRecentThanExistingEventIfExists existingGoogleEvents event then
-        Update event
+let syncEvent (existingGoogleEvents:IDictionary<string, ExistingEvent>) (event:Event) = 
+    if existingGoogleEvents.ContainsKey(event.Id) then
+        let existingEvent = existingGoogleEvents.Item(event.Id)
+        if existingEvent.UpdatedOnSource.Equals(event.UpdatedOnSource) then
+            UpToDate
+        else // even if UpdateOnSource is greater on Google than source (manually modified?)
+            Update event
     else
         Create event
 
@@ -106,6 +105,7 @@ let applySync (calendarService:CalendarService) calendarId syncAction =
                             ExtendedProperties = extendedProperties)
         calendarService.Events.Insert(googleEvent, calendarId).Execute() |> ignore 
     | Update e -> ()
+    | UpToDate -> () 
     syncAction
 
 [<EntryPoint>]
@@ -117,7 +117,7 @@ let main argv =
     |> Seq.map convertSourceEvent
     |> Seq.map (syncEvent existingGoogleEvents)
     |> Seq.map (applySync calendarService calendarId)
-    |> Seq.countBy (function | Create _ -> "created" | Update _ -> "updated")
+    |> Seq.countBy (function | Create _ -> "created" | Update _ -> "updated" | UpToDate -> "up to date")
     |> Seq.iter (fun x -> printfn "%i %s" (snd x) (fst x))
     0 // return an integer exit code
 
