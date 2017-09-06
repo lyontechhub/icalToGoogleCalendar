@@ -12,3 +12,15 @@
 #r "../packages/System.Reflection.TypeExtensions/lib/net461/System.Reflection.TypeExtensions.dll"
 #r "../packages/System.Runtime.Serialization.Formatters/lib/netstandard1.4/System.Runtime.Serialization.Formatters.dll"
 #r "../packages/System.ComponentModel.TypeConverter/lib/netstandard1.5/System.ComponentModel.TypeConverter.dll"
+
+#load "icalToGoogleCalendar.fs"
+
+// Just to test update: it allows to set updatedOnSource property in the past
+open Google.Apis.Calendar.v3
+open System
+let calendarId = "8hc5n2800f4paesicf2u8610d4@group.calendar.google.com"
+let calendarService = IcalToGoogleCalendar.getGoogleCalendarService ()
+let extendedProperties = 
+        Data.Event.ExtendedPropertiesData(
+            Shared = ([("updatedOnSource", DateTime.Now.AddYears(-1).ToString())] |> dict))
+calendarService.Events.Patch(Data.Event(ExtendedProperties = extendedProperties), calendarId, "_clr6arjkbsp38cph6crj6cpp81mmapbkelo2sorfdk").Execute()

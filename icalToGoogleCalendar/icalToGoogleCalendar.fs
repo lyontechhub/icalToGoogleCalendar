@@ -129,8 +129,3 @@ let main argv =
     |> Seq.countBy (function | Create _ -> "created" | Update _ -> "updated" | UpToDate -> "up to date")
     |> Seq.iter (fun x -> printfn "%i %s" (snd x) (fst x))
     0 // return an integer exit code
-
-    let extendedProperties = 
-            Data.Event.ExtendedPropertiesData(
-                Shared = ([("updatedOnSource", DateTime.Now.AddYears(-1).ToString())] |> dict))
-    calendarService.Events.Patch(Data.Event(ExtendedProperties = extendedProperties), calendarId, "_clr6arjkbsp38cph6crj6cpp81mmapbkelo2sorfdk").Execute()
