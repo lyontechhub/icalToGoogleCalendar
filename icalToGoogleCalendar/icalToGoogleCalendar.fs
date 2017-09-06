@@ -33,19 +33,6 @@ let getGoogleCalendarService () =
                                 ApplicationName = "MeetupToGoogle")
     new CalendarService(baseClientService)
 
-// let e = Data.Event(
-//             Summary = "Youhou!!",
-//             Start = Data.EventDateTime(DateTime = Nullable(DateTime.Now)),
-//             End = Data.EventDateTime(DateTime = Nullable(DateTime.Now.AddHours(2.0))))
-// calendarService.Events.Insert(e, calendarId).Execute()
-
-// let eventsRequest = calendarService.Events.List(
-//                         calendarId, 
-//                         OrderBy = Nullable(EventsResource.ListRequest.OrderByEnum.StartTime),
-//                         TimeMin = Nullable(DateTime.Now))
-// let events = eventsRequest.Execute()
-
-
 open System.Collections.Generic
 open Ical.Net.Interfaces.Components
 
