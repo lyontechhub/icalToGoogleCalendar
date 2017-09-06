@@ -61,7 +61,6 @@ and Event = {
 and EventId = string
 
 let isSourceEventMoreRecentThanGoogleEventIfExist (existingGoogleEvents:IDictionary<string, Data.Event>) (sourceEvent:IEvent) =
-    printfn "%b" (existingGoogleEvents.Item(sourceEvent.Uid).ExtendedProperties <> null)
     existingGoogleEvents.ContainsKey(sourceEvent.Uid) 
         && existingGoogleEvents.Item(sourceEvent.Uid).ExtendedProperties <> null
         && existingGoogleEvents.Item(sourceEvent.Uid).ExtendedProperties.Shared.ContainsKey("updatedOnSource")
@@ -106,7 +105,7 @@ let main argv =
             calendarId, 
             ShowDeleted = Nullable(true),
             MaxResults = Nullable(1000),
-            TimeMin = Nullable(DateTime.Now)).Execute().Items
+            TimeMin = Nullable(DateTime.Now.AddDays(-2.0))).Execute().Items
         |> Seq.map (fun e -> e.ICalUID, e)
         |> dict
     getEvents()
