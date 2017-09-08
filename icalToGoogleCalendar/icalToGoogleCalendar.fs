@@ -2,9 +2,7 @@ module IcalToGoogleCalendar
 
 open FSharp.Data
 
-let icalUrl = "http://www.meetup.com/fr-FR/CARA-Lyon/events/ical/"
-
-let getEvents () =
+let getEvents icalUrl =
     let response = Http.RequestStream icalUrl
     let calendar = Ical.Net.Calendar.LoadFromStream(response.ResponseStream)
     calendar 
@@ -119,10 +117,11 @@ let applySync (calendarService:CalendarService) calendarId syncAction =
 
 [<EntryPoint>]
 let main argv =
+    let icalUrl = "http://www.meetup.com/fr-FR/CARA-Lyon/events/ical/"
     let calendarId = "8hc5n2800f4paesicf2u8610d4@group.calendar.google.com" 
     let calendarService = getGoogleCalendarService()
     let existingGoogleEvents = getExistingGoogleEvents calendarService calendarId
-    getEvents()
+    getEvents icalUrl
     |> Seq.map convertSourceEvent
     |> Seq.map (syncEvent existingGoogleEvents)
     |> Seq.map (applySync calendarService calendarId)
