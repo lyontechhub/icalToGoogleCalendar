@@ -22,9 +22,9 @@ Target "Clean" (fun _ ->
 )
 
 Target "Build" (fun _ ->
-    // compile all projects below src/app/
-    MSBuildDebug buildDir "Build" appReferences
-    |> Log "AppBuild-Output: "
+    appReferences
+    |> Seq.iter (fun project -> 
+        DotNetCli.Build (fun p -> { p with Project = project; Output = buildDir }))
 )
 
 Target "Deploy" (fun _ ->
